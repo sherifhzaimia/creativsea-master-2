@@ -1,21 +1,23 @@
 require('dotenv').config();
-const puppeteer = require("puppeteer");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const authService = require('./services/auth.service');
 
 // إعداد Rate Limiter
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 دقائق
-  max: 100 // الحد الأقصى للطلبات لكل IP
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// تطبيق Rate Limiter
 app.use(limiter);
+app.use(express.json());
+app.use(helmet());
 
 // إعداد CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS.split(',');
@@ -24,10 +26,6 @@ app.use(cors({
   methods: ['GET', 'POST'],
   credentials: true
 }));
-
-// إضافة Helmet لتحسين الأمان
-const helmet = require('helmet');
-app.use(helmet());
 
 // الاتصال بقاعدة البيانات
 mongoose.connect(process.env.MONGODB_URI, {
@@ -41,6 +39,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // إنشاء نموذج للجلسات
 const sessionSchema = new mongoose.Schema({
+  siteName: String,
   name: String,
   value: String,
   domain: String,
@@ -48,113 +47,82 @@ const sessionSchema = new mongoose.Schema({
   expires: Number,
   httpOnly: Boolean,
   secure: Boolean,
-  createdAt: Date
+  createdAt: { type: Date, default: Date.now }
 });
 
 const Session = mongoose.model('Session', sessionSchema);
 
-async function extractSessionToken(res) {
-  let browser;
+// مسار لجلب الجلسة
+app.get("/get-session/:siteName", async (req, res) => {
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-        "--single-process",
-      ]
-    });
-
-    const page = await browser.newPage();
+    const { siteName } = req.params;
+    const session = await Session.findOne({ siteName }).sort({ createdAt: -1 });
     
-    // إضافة User-Agent
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-    console.log('Navigating to login page...');
-    await page.goto("https://creativsea.com/my-account/", {
-      waitUntil: "networkidle2",
-      timeout: 120000,
-    });
-
-    console.log('Entering credentials...');
-    await page.type("#username", process.env.CREATIVSEA_EMAIL);
-    await page.type("#password", process.env.CREATIVSEA_PASSWORD);
-
-    await Promise.all([
-      page.click('button[name="login"]'),
-      page.waitForNavigation({ waitUntil: "networkidle2", timeout: 60000 })
-    ]);
-
-    const cookies = await page.cookies();
-    console.log('Got cookies successfully');
-
-    await Session.deleteMany({});
-    console.log("Old sessions deleted");
-
-    const sessionToken = cookies.find(
-      (cookie) => cookie.name === "wordpress_logged_in_69f5389998994e48cb1f2b3bcad30e49"
-    );
-
-    if (sessionToken) {
-      const sessionData = new Session({
-        name: sessionToken.name,
-        value: sessionToken.value,
-        domain: sessionToken.domain,
-        path: sessionToken.path,
-        expires: sessionToken.expires,
-        httpOnly: sessionToken.httpOnly,
-        secure: sessionToken.secure,
-        createdAt: new Date()
+    if (!session) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'No session found for this site' 
       });
-
-      await sessionData.save();
-      console.log("Session token saved successfully");
-      res.json({ success: true, token: sessionData });
-    } else {
-      throw new Error('Session token not found');
     }
+
+    res.json({ success: true, token: session });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error fetching session:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message || 'An error occurred during the process' 
+      error: error.message || 'Error fetching session' 
     });
-  } finally {
-    if (browser) {
-      await browser.close();
-      console.log('Browser closed');
-    }
   }
-}
+});
 
-// نقطة النهاية الجديدة لجلب أحدث بيانات الجلسة
-app.get("/get-session", async (req, res) => {
+// مسار لبدء جلسة جديدة
+app.post("/start-session/:siteName", async (req, res) => {
   try {
-    // استرجاع أحدث جلسة من قاعدة البيانات
-    const sessionData = await Session.findOne().sort({ _id: -1 });
+    const { siteName } = req.params;
+    const credentials = {
+      username: process.env[`${siteName.toUpperCase()}_EMAIL`],
+      password: process.env[`${siteName.toUpperCase()}_PASSWORD`]
+    };
 
-    if (sessionData) {
-      res.json({ success: true, session: sessionData });
-    } else {
-      res.json({ success: false, message: "No session data found." });
-    }
+    const result = await authService.login(siteName, credentials);
+    
+    // حذف الجلسات القديمة للموقع
+    await Session.deleteMany({ siteName });
+
+    // حفظ الجلسة الجديدة
+    const sessionData = new Session({
+      siteName,
+      ...result.token
+    });
+
+    await sessionData.save();
+    console.log(`Session saved for ${siteName}`);
+
+    res.json({ success: true, token: sessionData });
   } catch (error) {
-    console.error("Error retrieving session data:", error);
-    res.status(500).json({ success: false, message: "Error retrieving session data." });
+    console.error('Error starting session:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Error starting session' 
+    });
   }
 });
 
-app.get("/start-session", (req, res) => {
-  extractSessionToken(res);
+// مسار الصحة
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date(),
+    sites: Object.keys(require('./config/sites'))
+  });
 });
 
-// إضافة مسار الصحة
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date() });
-     });
+// تنظيف الموارد عند إيقاف التطبيق
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received. Cleaning up...');
+  await authService.cleanup();
+  process.exit(0);
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
