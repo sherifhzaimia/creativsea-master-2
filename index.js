@@ -75,8 +75,8 @@ app.get("/get-session/:siteName", async (req, res) => {
   }
 });
 
-// مسار لبدء جلسة جديدة
-app.post("/start-session/:siteName", async (req, res) => {
+// دالة معالجة الجلسة
+async function handleSession(req, res) {
   try {
     const { siteName } = req.params;
     const credentials = {
@@ -84,6 +84,7 @@ app.post("/start-session/:siteName", async (req, res) => {
       password: process.env[`${siteName.toUpperCase()}_PASSWORD`]
     };
 
+    console.log(`Starting session for ${siteName}...`);
     const result = await authService.login(siteName, credentials);
     
     // حذف الجلسات القديمة للموقع
@@ -106,7 +107,11 @@ app.post("/start-session/:siteName", async (req, res) => {
       error: error.message || 'Error starting session' 
     });
   }
-});
+}
+
+// مسار لبدء جلسة جديدة (يدعم GET و POST)
+app.get("/start-session/:siteName", handleSession);
+app.post("/start-session/:siteName", handleSession);
 
 // مسار الصحة
 app.get('/health', (req, res) => {

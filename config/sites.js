@@ -13,8 +13,8 @@ const sites = {
     waitForNavigation: true
   },
   // يمكن إضافة مواقع أخرى هنا
-  example: {
-    name: 'Example Site',
+  designbeastapp: {
+    name: 'designbeastapp',
     loginUrl: 'https://designbeastapp.com/Dashboard/Account/Login',
     selectors: {
       username: 'input[name="EmailId"]',
