@@ -1,19 +1,29 @@
 {
   "name": "puppeteer-heroku",
   "version": "1.0.0",
-  "description": "",
+  "description": "CreativSea Session Manager",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
     "express": "^4.21.1",
+    "express-rate-limit": "^6.7.0",
+    "helmet": "^6.1.5",
     "mongodb": "^6.10.0",
     "mongoose": "^8.8.0",
     "puppeteer": "^16.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
