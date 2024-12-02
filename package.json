@@ -18,10 +18,10 @@
     "helmet": "^6.1.5",
     "mongodb": "^6.10.0",
     "mongoose": "^8.8.0",
-    "puppeteer": "^16.2.0"
+    "puppeteer": "^23.9.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^3.1.7"
   },
   "engines": {
     "node": ">=14.0.0"
