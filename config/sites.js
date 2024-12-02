@@ -39,6 +39,20 @@ const sites = {
       session: 'remember_me'
     },
     waitForNavigation: true
+  },
+  // إضافة موقع Academun
+  academun: {
+    name: 'Academun',
+    loginUrl: 'https://academun.com/dashboard/',
+    selectors: {
+      username: 'input[name="log"]',
+      password: 'input[name="pwd"]',
+      loginButton: '#tutor-login-form > button'
+    },
+    cookies: {
+      session: 'wordpress_logged_in_ada51868a6667b3f41712245b62dfcd7'
+    },
+    waitForNavigation: true
   }
 };
 
