@@ -40,9 +40,16 @@ class AuthService {
         timeout: 120000,
       });
 
+      // انتظار ظهور حقل اسم المستخدم
+      console.log('Waiting for username field...');
+      await page.waitForSelector(siteConfig.selectors.username, { visible: true, timeout: 60000 });
+
       console.log('Entering credentials...');
       await page.type(siteConfig.selectors.username, credentials.username);
       await page.type(siteConfig.selectors.password, credentials.password);
+
+      // التأكد من وجود زر تسجيل الدخول
+      await page.waitForSelector(siteConfig.selectors.loginButton, { visible: true, timeout: 30000 });
 
       if (siteConfig.waitForNavigation) {
         await Promise.all([
@@ -51,6 +58,8 @@ class AuthService {
         ]);
       } else {
         await page.click(siteConfig.selectors.loginButton);
+        // انتظار قليلاً بعد النقر
+        await page.waitForTimeout(5000);
       }
 
       const cookies = await page.cookies();
@@ -73,6 +82,9 @@ class AuthService {
 
     } catch (error) {
       console.error('Login Error:', error);
+      if (error.message.includes('timeout')) {
+        throw new Error(`Timeout error: Could not find element ${error.message}`);
+      }
       throw error;
     }
   }
