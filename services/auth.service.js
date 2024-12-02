@@ -1,82 +1,88 @@
 const puppeteer = require('puppeteer');
 const sites = require('../config/sites');
 
-let browser;
+class AuthService {
+  constructor() {
+    this.browser = null;
+  }
 
-async function initBrowser() {
-  if (!browser) {
-    browser = await puppeteer.launch({
+  async initBrowser() {
+    this.browser = await puppeteer.launch({
+      headless: true,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920x1080',
-      ],
-      headless: true
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-zygote",
+        "--single-process",
+      ]
     });
   }
-  return browser;
-}
 
-async function login(siteName, credentials) {
-  console.log(`Starting login process for ${siteName}...`);
-  const site = sites[siteName];
-  
-  if (!site) {
-    throw new Error(`Site configuration not found for ${siteName}`);
-  }
+  async login(siteName, credentials) {
+    try {
+      const siteConfig = sites[siteName];
+      if (!siteConfig) {
+        throw new Error(`Site configuration not found for: ${siteName}`);
+      }
 
-  try {
-    const browser = await initBrowser();
-    const page = await browser.newPage();
-    
-    // Set a reasonable navigation timeout
-    page.setDefaultNavigationTimeout(30000);
+      if (!this.browser) {
+        await this.initBrowser();
+      }
 
-    console.log(`Navigating to ${site.loginUrl}...`);
-    await page.goto(site.loginUrl, { waitUntil: 'networkidle0' });
+      const page = await this.browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
-    // Wait for form elements
-    await page.waitForSelector(site.selectors.username);
-    await page.waitForSelector(site.selectors.password);
-    await page.waitForSelector(site.selectors.loginButton);
+      console.log(`Navigating to ${siteConfig.name} login page...`);
+      await page.goto(siteConfig.loginUrl, {
+        waitUntil: "networkidle2",
+        timeout: 120000,
+      });
 
-    console.log('Entering credentials...');
-    await page.type(site.selectors.username, credentials.username);
-    await page.type(site.selectors.password, credentials.password);
+      console.log('Entering credentials...');
+      await page.type(siteConfig.selectors.username, credentials.username);
+      await page.type(siteConfig.selectors.password, credentials.password);
 
-    // Click login button and wait for navigation
-    await Promise.all([
-      site.waitForNavigation ? page.waitForNavigation({ waitUntil: 'networkidle0' }) : Promise.resolve(),
-      page.click(site.selectors.loginButton)
-    ]);
+      if (siteConfig.waitForNavigation) {
+        await Promise.all([
+          page.click(siteConfig.selectors.loginButton),
+          page.waitForNavigation({ waitUntil: "networkidle2", timeout: 60000 })
+        ]);
+      } else {
+        await page.click(siteConfig.selectors.loginButton);
+      }
 
-    console.log('Getting cookies...');
-    const cookies = await page.cookies();
-    const sessionCookie = cookies.find(cookie => cookie.name === site.cookies.session);
+      const cookies = await page.cookies();
+      console.log('Got cookies successfully');
 
-    if (!sessionCookie) {
-      throw new Error(`Session cookie not found for ${siteName}`);
+      const sessionToken = cookies.find(
+        (cookie) => cookie.name === siteConfig.cookies.session
+      );
+
+      await page.close();
+
+      if (!sessionToken) {
+        throw new Error('Session token not found');
+      }
+
+      return {
+        success: true,
+        token: sessionToken
+      };
+
+    } catch (error) {
+      console.error('Login Error:', error);
+      throw error;
     }
+  }
 
-    await page.close();
-    return { token: sessionCookie };
-  } catch (error) {
-    console.error(`Login error for ${siteName}:`, error);
-    throw error;
+  async cleanup() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
   }
 }
 
-async function cleanup() {
-  if (browser) {
-    await browser.close();
-    browser = null;
-  }
-}
-
-module.exports = {
-  login,
-  cleanup
-};
+module.exports = new AuthService();
