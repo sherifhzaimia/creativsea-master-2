@@ -17,9 +17,9 @@ const sites = {
     name: 'designbeastapp',
     loginUrl: 'https://designbeastapp.com/Dashboard/Account/Login',
     selectors: {
-      username: 'input[name="EmailId"]',
-      password: 'input[name="Password"]',
-      loginButton: 'button[type="submit"]'
+      username: '#EmailId',
+      password: '#Password',
+      loginButton: 'body > div > div > div > form > div.container-login100-form-btn > button'
     },
     cookies: {
       session: 'ASP.NET_SessionId'
