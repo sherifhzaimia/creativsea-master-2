@@ -12,19 +12,6 @@ const sites = {
     },
     waitForNavigation: true
   },
-  designbeastapp: {
-    name: 'designbeastapp',
-    loginUrl: 'https://designbeastapp.com/Dashboard/Account/Login',
-    selectors: {
-      username: '#EmailId',
-      password: '#Password',
-      loginButton: 'body > div > div > div > form > div.container-login100-form-btn > button'
-    },
-    cookies: {
-      session: 'ASP.NET_SessionId'
-    },
-    waitForNavigation: true
-  },
   // إضافة موقع Peeksta
   peeksta: {
     name: 'Peeksta',
@@ -36,6 +23,20 @@ const sites = {
     },
     cookies: {
       session: 'appSession'
+    },
+    waitForNavigation: true
+  },
+  // إضافة موقع Winninghunter
+  winninghunter: {
+    name: 'Winninghunter',
+    loginUrl: 'https://app.winninghunter.com/login',
+    selectors: {
+      username: '#Email-2',
+      password: '#Password',
+      loginButton: 'button[type="submit"]'
+    },
+    cookies: {
+      session: 'remember_me'
     },
     waitForNavigation: true
   }
