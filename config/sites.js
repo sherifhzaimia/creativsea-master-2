@@ -22,7 +22,7 @@ const sites = {
       loginButton: 'button[type="submit"]'
     },
     cookies: {
-      session: '.alert-danger'
+      session: 'ASP.NET_SessionId'
     },
     waitForNavigation: true
   }
