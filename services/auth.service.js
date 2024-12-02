@@ -54,22 +54,17 @@ class AuthService {
       }
 
       const cookies = await page.cookies();
-      console.log('Got cookies:', cookies);
+      console.log('Got cookies successfully');
 
       const sessionToken = cookies.find(
-        (cookie) => {
-          console.log('Checking cookie:', cookie.name, 'against', siteConfig.cookies.session);
-          return cookie.name === siteConfig.cookies.session;
-        }
+        (cookie) => cookie.name === siteConfig.cookies.session
       );
 
       await page.close();
 
       if (!sessionToken) {
-        throw new Error(`Session token not found. Looking for: ${siteConfig.cookies.session}`);
+        throw new Error('Session token not found');
       }
-
-      console.log('Found session token:', sessionToken);
 
       return {
         success: true,
