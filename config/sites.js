@@ -12,6 +12,20 @@ const sites = {
     },
     waitForNavigation: true
   },
+  // إضافة موقع DesignBeastApp
+  designbeastapp: {
+    name: 'DesignBeastApp',
+    loginUrl: 'https://designbeastapp.com/Dashboard/Account/Login',
+    selectors: {
+      username: 'input[name="EmailId"]',
+      password: 'input[name="Password"]',
+      loginButton: 'button[type="submit"]'
+    },
+    cookies: {
+      session: 'ASP.NET_SessionId'
+    },
+    waitForNavigation: true
+  },
   // إضافة موقع Peeksta
   peeksta: {
     name: 'Peeksta',
