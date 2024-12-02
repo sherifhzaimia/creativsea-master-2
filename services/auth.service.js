@@ -1,100 +1,82 @@
 const puppeteer = require('puppeteer');
 const sites = require('../config/sites');
 
-class AuthService {
-  constructor() {
-    this.browser = null;
-  }
+let browser;
 
-  async initBrowser() {
-    this.browser = await puppeteer.launch({
-      headless: true,
+async function initBrowser() {
+  if (!browser) {
+    browser = await puppeteer.launch({
       args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-        "--single-process",
-      ]
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920x1080',
+      ],
+      headless: true
     });
   }
+  return browser;
+}
 
-  async login(siteName, credentials) {
-    try {
-      const siteConfig = sites[siteName];
-      if (!siteConfig) {
-        throw new Error(`Site configuration not found for: ${siteName}`);
-      }
-
-      if (!this.browser) {
-        await this.initBrowser();
-      }
-
-      const page = await this.browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-      console.log(`Navigating to ${siteConfig.name} login page...`);
-      await page.goto(siteConfig.loginUrl, {
-        waitUntil: "networkidle2",
-        timeout: 120000,
-      });
-
-      // انتظار ظهور حقل اسم المستخدم
-      console.log('Waiting for username field...');
-      await page.waitForSelector(siteConfig.selectors.username, { visible: true, timeout: 60000 });
-
-      console.log('Entering credentials...');
-      await page.type(siteConfig.selectors.username, credentials.username);
-      await page.type(siteConfig.selectors.password, credentials.password);
-
-      // التأكد من وجود زر تسجيل الدخول
-      await page.waitForSelector(siteConfig.selectors.loginButton, { visible: true, timeout: 30000 });
-
-      if (siteConfig.waitForNavigation) {
-        await Promise.all([
-          page.click(siteConfig.selectors.loginButton),
-          page.waitForNavigation({ waitUntil: "networkidle2", timeout: 60000 })
-        ]);
-      } else {
-        await page.click(siteConfig.selectors.loginButton);
-        // انتظار قليلاً بعد النقر
-        await page.waitForTimeout(5000);
-      }
-
-      const cookies = await page.cookies();
-      console.log('Got cookies successfully');
-
-      const sessionToken = cookies.find(
-        (cookie) => cookie.name === siteConfig.cookies.session
-      );
-
-      await page.close();
-
-      if (!sessionToken) {
-        throw new Error('Session token not found');
-      }
-
-      return {
-        success: true,
-        token: sessionToken
-      };
-
-    } catch (error) {
-      console.error('Login Error:', error);
-      if (error.message.includes('timeout')) {
-        throw new Error(`Timeout error: Could not find element ${error.message}`);
-      }
-      throw error;
-    }
+async function login(siteName, credentials) {
+  console.log(`Starting login process for ${siteName}...`);
+  const site = sites[siteName];
+  
+  if (!site) {
+    throw new Error(`Site configuration not found for ${siteName}`);
   }
 
-  async cleanup() {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
+  try {
+    const browser = await initBrowser();
+    const page = await browser.newPage();
+    
+    // Set a reasonable navigation timeout
+    page.setDefaultNavigationTimeout(30000);
+
+    console.log(`Navigating to ${site.loginUrl}...`);
+    await page.goto(site.loginUrl, { waitUntil: 'networkidle0' });
+
+    // Wait for form elements
+    await page.waitForSelector(site.selectors.username);
+    await page.waitForSelector(site.selectors.password);
+    await page.waitForSelector(site.selectors.loginButton);
+
+    console.log('Entering credentials...');
+    await page.type(site.selectors.username, credentials.username);
+    await page.type(site.selectors.password, credentials.password);
+
+    // Click login button and wait for navigation
+    await Promise.all([
+      site.waitForNavigation ? page.waitForNavigation({ waitUntil: 'networkidle0' }) : Promise.resolve(),
+      page.click(site.selectors.loginButton)
+    ]);
+
+    console.log('Getting cookies...');
+    const cookies = await page.cookies();
+    const sessionCookie = cookies.find(cookie => cookie.name === site.cookies.session);
+
+    if (!sessionCookie) {
+      throw new Error(`Session cookie not found for ${siteName}`);
     }
+
+    await page.close();
+    return { token: sessionCookie };
+  } catch (error) {
+    console.error(`Login error for ${siteName}:`, error);
+    throw error;
   }
 }
 
-module.exports = new AuthService();
+async function cleanup() {
+  if (browser) {
+    await browser.close();
+    browser = null;
+  }
+}
+
+module.exports = {
+  login,
+  cleanup
+};
